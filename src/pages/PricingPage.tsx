@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import PaddleCheckout from '../components/PaddleCheckout';
+import DonationWidget from '../components/DonationWidget';
 import { 
   Check, 
   X, 
@@ -15,12 +17,15 @@ import {
   Building,
   Phone,
   Mail,
-  Globe
+  Globe,
+  Heart
 } from 'lucide-react';
 
 const PricingPage: React.FC = () => {
   const { user } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [showCheckout, setShowCheckout] = useState<string | null>(null);
+  const [showDonation, setShowDonation] = useState(false);
 
   const plans = [
     {
@@ -169,6 +174,79 @@ const PricingPage: React.FC = () => {
     return plan.buttonText[billingCycle];
   };
 
+  const handlePlanSelect = (planName: string) => {
+    if (planName === 'Starter') {
+      if (user) {
+        window.location.href = '/dashboard';
+      } else {
+        window.location.href = '/signup';
+      }
+    } else if (planName === 'Enterprise') {
+      window.location.href = '/support';
+    } else {
+      setShowCheckout(planName.toLowerCase());
+    }
+  };
+
+  if (showCheckout) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Complete Your Subscription</h1>
+            <p className="text-gray-600">Secure payment processing by Paddle.com</p>
+          </div>
+          
+          <PaddleCheckout
+            planType={showCheckout as 'pro' | 'enterprise'}
+            userEmail={user?.email}
+            onSuccess={() => {
+              alert('Subscription successful! Welcome to Devmint Pro!');
+              window.location.href = '/dashboard?payment=success';
+            }}
+            onError={(error) => {
+              alert(`Subscription failed: ${error}`);
+              setShowCheckout(null);
+            }}
+          />
+          
+          <div className="text-center mt-6">
+            <button
+              onClick={() => setShowCheckout(null)}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              ← Back to pricing plans
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showDonation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Support Devmint</h1>
+            <p className="text-gray-600">Help us continue building amazing API tools</p>
+          </div>
+          
+          <DonationWidget />
+          
+          <div className="text-center mt-6">
+            <button
+              onClick={() => setShowDonation(false)}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              ← Back to pricing plans
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Hero Section */}
@@ -311,32 +389,40 @@ const PricingPage: React.FC = () => {
                   </div>
 
                   {/* CTA Button */}
-                  {user ? (
-                    <Link
-                      to="/dashboard"
-                      className={`w-full py-4 px-6 rounded-xl font-semibold text-center block transition-all duration-200 ${
-                        plan.buttonStyle === 'primary'
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 shadow-lg'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      {getButtonText(plan)}
-                    </Link>
-                  ) : (
-                    <Link
-                      to={plan.name === 'Enterprise' ? '/support' : '/signup'}
-                      className={`w-full py-4 px-6 rounded-xl font-semibold text-center block transition-all duration-200 ${
-                        plan.buttonStyle === 'primary'
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 shadow-lg'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      {getButtonText(plan)}
-                    </Link>
-                  )}
+                  <button
+                    onClick={() => handlePlanSelect(plan.name)}
+                    className={`w-full py-4 px-6 rounded-xl font-semibold text-center transition-all duration-200 ${
+                      plan.buttonStyle === 'primary'
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 shadow-lg'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                    {getButtonText(plan)}
+                  </button>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Donation Section */}
+          <div className="mt-16 text-center">
+            <div className="bg-white rounded-3xl shadow-xl p-8 max-w-2xl mx-auto">
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Heart className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Support Our Mission</h3>
+              <p className="text-gray-600 mb-6">
+                Love what we're building? Support Devmint with a donation to help us continue 
+                providing amazing API tools for developers worldwide.
+              </p>
+              <button
+                onClick={() => setShowDonation(true)}
+                className="px-8 py-4 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-xl font-semibold hover:from-pink-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
+              >
+                <Heart className="w-5 h-5 mr-2 inline" />
+                Make a Donation
+              </button>
+            </div>
           </div>
         </div>
       </section>
