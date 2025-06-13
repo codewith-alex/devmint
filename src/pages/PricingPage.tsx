@@ -24,7 +24,7 @@ import {
 const PricingPage: React.FC = () => {
   const { user } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [showCheckout, setShowCheckout] = useState<string | null>(null);
+  const [showCheckout, setShowCheckout] = useState<{ plan: string; billing: 'monthly' | 'yearly' } | null>(null);
   const [showDonation, setShowDonation] = useState(false);
 
   const plans = [
@@ -58,6 +58,7 @@ const PricingPage: React.FC = () => {
       description: "For growing businesses and teams",
       price: { monthly: 29, yearly: 24 },
       originalPrice: { monthly: 29, yearly: 29 },
+      realPrice: { monthly: 29, yearly: 288 }, // Real prices
       features: [
         { name: "50,000 API calls/month", included: true },
         { name: "25+ premium templates", included: true },
@@ -83,6 +84,7 @@ const PricingPage: React.FC = () => {
       description: "For large organizations with high-volume needs",
       price: { monthly: 99, yearly: 82 },
       originalPrice: { monthly: 99, yearly: 99 },
+      realPrice: { monthly: 99, yearly: 984 }, // Real prices
       features: [
         { name: "Unlimited API calls", included: true },
         { name: "All premium templates", included: true },
@@ -160,14 +162,16 @@ const PricingPage: React.FC = () => {
   ];
 
   const getSavings = (plan: typeof plans[0]) => {
-    if (plan.price.yearly === 0) return 0;
-    const monthlyCost = plan.originalPrice.monthly * 12;
-    const yearlyCost = plan.price.yearly * 12;
-    return monthlyCost - yearlyCost;
+    if (plan.realPrice && plan.realPrice.yearly > 0) {
+      const monthlyCost = plan.realPrice.monthly * 12;
+      const yearlyCost = plan.realPrice.yearly;
+      return monthlyCost - yearlyCost;
+    }
+    return 0;
   };
 
   const getYearlyPrice = (plan: typeof plans[0]) => {
-    return plan.price.yearly * 12;
+    return plan.realPrice ? plan.realPrice.yearly : plan.price.yearly * 12;
   };
 
   const getButtonText = (plan: typeof plans[0]) => {
@@ -184,7 +188,7 @@ const PricingPage: React.FC = () => {
     } else if (planName === 'Enterprise') {
       window.location.href = '/support';
     } else {
-      setShowCheckout(planName.toLowerCase());
+      setShowCheckout({ plan: planName.toLowerCase(), billing: billingCycle });
     }
   };
 
@@ -198,10 +202,11 @@ const PricingPage: React.FC = () => {
           </div>
           
           <PaddleCheckout
-            planType={showCheckout as 'pro' | 'enterprise'}
+            planType={showCheckout.plan as 'pro' | 'enterprise'}
+            billingCycle={showCheckout.billing}
             userEmail={user?.email}
             onSuccess={() => {
-              alert('Subscription successful! Welcome to Devmint Pro!');
+              alert('Subscription successful! Welcome to Devmint!');
               window.location.href = '/dashboard?payment=success';
             }}
             onError={(error) => {
@@ -342,7 +347,7 @@ const PricingPage: React.FC = () => {
                           /{billingCycle === 'monthly' ? 'month' : 'month'}
                         </span>
                       </div>
-                      {billingCycle === 'yearly' && plan.price.yearly > 0 && (
+                      {billingCycle === 'yearly' && plan.realPrice && plan.realPrice.yearly > 0 && (
                         <div className="mt-2">
                           <div className="text-sm text-gray-500">
                             Billed annually: ${getYearlyPrice(plan)}

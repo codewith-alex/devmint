@@ -4,6 +4,7 @@ import { CreditCard, Loader, DollarSign } from 'lucide-react';
 
 interface PaddleCheckoutProps {
   planType: 'pro' | 'enterprise' | 'donation';
+  billingCycle?: 'monthly' | 'yearly';
   userEmail?: string;
   customAmount?: number;
   onSuccess?: () => void;
@@ -12,6 +13,7 @@ interface PaddleCheckoutProps {
 
 const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
   planType,
+  billingCycle = 'monthly',
   userEmail,
   customAmount,
   onSuccess,
@@ -20,10 +22,16 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Price IDs for different plans (you'll need to create these in Paddle dashboard)
+  // Real Paddle Price IDs from your dashboard
   const priceIds = {
-    pro: 'pri_01jxjhr5jjh2mhne2dnf9yz5s3', // Replace with actual Paddle price ID
-    enterprise: 'pri_01jxjhr5jjh2mhne2dnf9yz5s4', // Replace with actual Paddle price ID
+    pro: {
+      monthly: 'pri_01jxkfd08h8gwv7mqxw1ah948b', // Professional $29/month
+      yearly: 'pri_01jxkfsmdcw6tfx7s0wjkdbazr'   // Professional $288/year
+    },
+    enterprise: {
+      monthly: 'pri_01jxkfk7whgk1q9pjfxdt4kbg6', // Enterprise $99/month
+      yearly: 'pri_01jxkfxs04a3gxkrwj32kpzk30'   // Enterprise $984/year
+    }
   };
 
   useEffect(() => {
@@ -52,9 +60,9 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
       if (planType === 'donation' && customAmount) {
         await paddle.createCustomCheckout(customAmount, 'Donation to Devmint');
       } else {
-        const priceId = priceIds[planType];
+        const priceId = priceIds[planType][billingCycle];
         if (!priceId) {
-          throw new Error('Invalid plan type');
+          throw new Error('Invalid plan type or billing cycle');
         }
 
         await paddle.openCheckout({
@@ -62,9 +70,10 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
           customer: userEmail ? { email: userEmail } : undefined,
           customData: {
             planType,
+            billingCycle,
             userId: userEmail
           },
-          successUrl: `${window.location.origin}/dashboard?payment=success&plan=${planType}`
+          successUrl: `${window.location.origin}/dashboard?payment=success&plan=${planType}&billing=${billingCycle}`
         });
       }
       
@@ -82,13 +91,17 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
       case 'pro':
         return {
           name: 'Professional Plan',
-          price: '$29/month',
+          price: billingCycle === 'monthly' ? '$29/month' : '$288/year',
+          originalPrice: billingCycle === 'yearly' ? '$348/year' : undefined,
+          savings: billingCycle === 'yearly' ? '$60/year' : undefined,
           description: '50,000 API calls, premium templates, priority support'
         };
       case 'enterprise':
         return {
           name: 'Enterprise Plan',
-          price: '$99/month',
+          price: billingCycle === 'monthly' ? '$99/month' : '$984/year',
+          originalPrice: billingCycle === 'yearly' ? '$1,188/year' : undefined,
+          savings: billingCycle === 'yearly' ? '$204/year' : undefined,
           description: 'Unlimited API calls, custom templates, 24/7 support'
         };
       case 'donation':
@@ -115,8 +128,22 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
           )}
         </div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">{planDetails.name}</h3>
-        <div className="text-3xl font-bold text-blue-600 mb-2">{planDetails.price}</div>
+        <div className="text-3xl font-bold text-blue-600 mb-2">
+          {planDetails.price}
+          {planDetails.originalPrice && (
+            <div className="text-lg text-gray-500 line-through">{planDetails.originalPrice}</div>
+          )}
+        </div>
+        {planDetails.savings && (
+          <div className="text-green-600 font-semibold mb-2">Save {planDetails.savings}</div>
+        )}
         <p className="text-gray-600">{planDetails.description}</p>
+        
+        {billingCycle === 'yearly' && planType !== 'donation' && (
+          <div className="mt-3 inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            🎉 Best Value - Save {planDetails.savings}
+          </div>
+        )}
       </div>
 
       <button
@@ -134,7 +161,7 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
         ) : (
           <>
             <CreditCard className="w-5 h-5 mr-2" />
-            {planType === 'donation' ? 'Donate Now' : 'Subscribe Now'}
+            {planType === 'donation' ? 'Donate Now' : `Subscribe ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
           </>
         )}
       </button>
@@ -146,6 +173,11 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
             Paddle.com
           </a>
         </p>
+        {planType !== 'donation' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Cancel anytime • 30-day money-back guarantee
+          </p>
+        )}
       </div>
     </div>
   );
