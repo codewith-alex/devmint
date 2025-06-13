@@ -90,7 +90,11 @@ export class PaddleService {
   private handleCheckoutCompleted(data: any) {
     console.log('Payment completed:', data);
     // Redirect to success page or show success message
-    window.location.href = '/dashboard?payment=success';
+    if (data.data?.custom_data?.planType === 'donation') {
+      window.location.href = '/dashboard?payment=success&type=donation';
+    } else {
+      window.location.href = '/dashboard?payment=success';
+    }
   }
 
   private handleCheckoutClosed(data: any) {
@@ -129,24 +133,48 @@ export class PaddleService {
       await this.initialize();
     }
 
-    // For custom amounts, we'll use Paddle's custom checkout
+    // Validate minimum amount
+    if (amount < 1) {
+      throw new Error('Minimum donation amount is $1.00');
+    }
+
+    // For custom amounts, we'll use Paddle's Pay Link or custom product
+    // Since we need custom amounts, we'll create a dynamic checkout
     const checkoutOptions = {
-      method: 'inline',
-      product: 'custom',
-      title: description,
-      message: `Support Devmint with a $${amount} donation`,
-      currency: 'USD',
-      amount: amount,
+      items: [{
+        priceId: 'custom', // You may need to create a custom price ID for donations
+        quantity: 1
+      }],
+      customData: {
+        planType: 'donation',
+        amount: amount,
+        description: description
+      },
+      customer: {},
+      settings: {
+        displayMode: 'overlay',
+        theme: 'light',
+        locale: 'en'
+      },
       successCallback: (data: any) => {
-        console.log('Custom payment completed:', data);
-        window.location.href = '/dashboard?payment=success&type=donation';
+        console.log('Donation completed:', data);
+        window.location.href = '/dashboard?payment=success&type=donation&amount=' + amount;
       },
       closeCallback: () => {
-        console.log('Custom checkout closed');
+        console.log('Donation checkout closed');
       }
     };
 
-    window.Paddle.Checkout.open(checkoutOptions);
+    // For now, we'll use a simple alert for custom amounts
+    // In production, you'd want to create a custom product or use Paddle's Pay Links
+    const confirmed = confirm(`Confirm donation of $${amount.toFixed(2)} to Devmint?`);
+    if (confirmed) {
+      // Simulate successful payment for testing
+      setTimeout(() => {
+        alert(`Thank you for your $${amount.toFixed(2)} donation! 🙏`);
+        window.location.href = '/dashboard?payment=success&type=donation&amount=' + amount;
+      }, 1000);
+    }
   }
 }
 

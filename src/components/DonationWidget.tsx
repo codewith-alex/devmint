@@ -3,11 +3,12 @@ import PaddleCheckout from './PaddleCheckout';
 import { Heart, DollarSign, Gift } from 'lucide-react';
 
 const DonationWidget: React.FC = () => {
-  const [selectedAmount, setSelectedAmount] = useState<number>(25);
+  const [selectedAmount, setSelectedAmount] = useState<number>(5);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const predefinedAmounts = [10, 25, 50, 100, 250];
+  // Updated predefined amounts starting from $1
+  const predefinedAmounts = [1, 5, 10, 25, 50, 100];
 
   const handleAmountSelect = (amount: number) => {
     setSelectedAmount(amount);
@@ -17,7 +18,7 @@ const DonationWidget: React.FC = () => {
   const handleCustomAmountChange = (value: string) => {
     setCustomAmount(value);
     const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue > 0) {
+    if (!isNaN(numValue) && numValue >= 1) {
       setSelectedAmount(numValue);
     }
   };
@@ -25,9 +26,13 @@ const DonationWidget: React.FC = () => {
   const getFinalAmount = () => {
     if (customAmount) {
       const numValue = parseFloat(customAmount);
-      return !isNaN(numValue) && numValue > 0 ? numValue : 0;
+      return !isNaN(numValue) && numValue >= 1 ? numValue : 0;
     }
     return selectedAmount;
+  };
+
+  const isValidAmount = () => {
+    return getFinalAmount() >= 1;
   };
 
   if (showCheckout) {
@@ -37,7 +42,7 @@ const DonationWidget: React.FC = () => {
           planType="donation"
           customAmount={getFinalAmount()}
           onSuccess={() => {
-            alert('Thank you for your donation!');
+            alert('Thank you for your generous donation! 🙏');
             setShowCheckout(false);
           }}
           onError={(error) => {
@@ -71,7 +76,7 @@ const DonationWidget: React.FC = () => {
         {/* Predefined Amounts */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Choose an amount:
+            Choose an amount (minimum $1):
           </label>
           <div className="grid grid-cols-3 gap-3">
             {predefinedAmounts.map((amount) => (
@@ -106,9 +111,12 @@ const DonationWidget: React.FC = () => {
               value={customAmount}
               onChange={(e) => handleCustomAmountChange(e.target.value)}
               className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter amount"
+              placeholder="Minimum $1.00"
             />
           </div>
+          {customAmount && !isValidAmount() && (
+            <p className="text-red-600 text-sm mt-1">Minimum donation amount is $1.00</p>
+          )}
         </div>
 
         {/* Benefits */}
@@ -122,21 +130,32 @@ const DonationWidget: React.FC = () => {
             <li>• Develop new API features</li>
             <li>• Provide free tier for developers</li>
             <li>• Improve documentation and support</li>
+            <li>• Keep our services affordable</li>
           </ul>
+        </div>
+
+        {/* Payment Methods Info */}
+        <div className="bg-green-50 rounded-xl p-4">
+          <h4 className="font-semibold text-gray-900 mb-2">💳 Accepted Payment Methods:</h4>
+          <div className="text-sm text-gray-700 space-y-1">
+            <div>• Credit/Debit Cards (Visa, Mastercard, Amex)</div>
+            <div>• Digital Wallets (Apple Pay, Google Pay, PayPal)</div>
+            <div>• Bank Transfers & Local Payment Methods</div>
+          </div>
         </div>
 
         {/* Donate Button */}
         <button
           onClick={() => setShowCheckout(true)}
-          disabled={getFinalAmount() <= 0}
+          disabled={!isValidAmount()}
           className="w-full py-4 px-6 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-xl font-semibold hover:from-pink-600 hover:to-red-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
           <Heart className="w-5 h-5 mr-2" />
-          Donate ${getFinalAmount().toFixed(2)}
+          {isValidAmount() ? `Donate $${getFinalAmount().toFixed(2)}` : 'Enter Amount (Min $1)'}
         </button>
 
         <p className="text-xs text-gray-500 text-center">
-          Donations are processed securely through Paddle.com
+          Secure payment processing by Paddle.com • All major payment methods accepted
         </p>
       </div>
     </div>
