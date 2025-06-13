@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { paddle } from '../utils/paddle';
-import { CreditCard, Loader, DollarSign } from 'lucide-react';
+import { CreditCard, Loader, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface PaddleCheckoutProps {
   planType: 'pro' | 'enterprise' | 'donation';
@@ -21,6 +21,8 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [paddleStatus, setPaddleStatus] = useState<string>('Initializing...');
 
   // Real Paddle Price IDs from your dashboard
   const priceIds = {
@@ -40,30 +42,52 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
 
   const initializePaddle = async () => {
     try {
+      setIsLoading(true);
+      setPaddleStatus('Loading Paddle.js...');
+      
       await paddle.initialize();
+      
       setIsInitialized(true);
+      setInitError(null);
+      setPaddleStatus('Ready for payment');
+      
+      console.log('Paddle initialization completed successfully');
     } catch (error) {
       console.error('Failed to initialize Paddle:', error);
+      setInitError(`Failed to initialize payment system: ${error}`);
+      setPaddleStatus('Failed to load');
       onError?.('Failed to initialize payment system');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleCheckout = async () => {
     if (!isInitialized) {
-      onError?.('Payment system not ready');
+      onError?.('Payment system not ready. Please refresh the page.');
+      return;
+    }
+
+    if (!paddle.isReady()) {
+      onError?.('Paddle is not ready. Please try again.');
       return;
     }
 
     setIsLoading(true);
+    setPaddleStatus('Opening checkout...');
 
     try {
       if (planType === 'donation' && customAmount) {
-        await paddle.createCustomCheckout(customAmount, 'Donation to Devmint');
+        console.log(`Starting donation checkout for $${customAmount}`);
+        await paddle.createDonationCheckout(customAmount, 'Donation to Devmint');
       } else {
         const priceId = priceIds[planType][billingCycle];
         if (!priceId) {
           throw new Error('Invalid plan type or billing cycle');
         }
+
+        console.log(`Starting subscription checkout for ${planType} ${billingCycle} plan`);
+        console.log(`Using price ID: ${priceId}`);
 
         await paddle.openCheckout({
           items: [{ priceId, quantity: 1 }],
@@ -71,16 +95,23 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
           customData: {
             planType,
             billingCycle,
-            userId: userEmail
+            userId: userEmail || 'anonymous'
           },
-          successUrl: `${window.location.origin}/dashboard?payment=success&plan=${planType}&billing=${billingCycle}`
+          settings: {
+            displayMode: 'overlay',
+            theme: 'light',
+            locale: 'en'
+          }
         });
       }
       
+      setPaddleStatus('Checkout opened successfully');
       onSuccess?.();
+      
     } catch (error) {
       console.error('Checkout error:', error);
-      onError?.('Failed to start checkout process');
+      setPaddleStatus('Checkout failed');
+      onError?.(`Failed to start checkout: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +125,15 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
           price: billingCycle === 'monthly' ? '$29/month' : '$288/year',
           originalPrice: billingCycle === 'yearly' ? '$348/year' : undefined,
           savings: billingCycle === 'yearly' ? '$60/year' : undefined,
-          description: '50,000 API calls, premium templates, priority support'
+          description: '50,000 API calls, premium templates, priority support',
+          features: [
+            '50,000 API calls per month',
+            '25+ premium invoice templates',
+            'Priority email support',
+            'Advanced analytics dashboard',
+            'Custom branding options',
+            'Team collaboration (5 seats)'
+          ]
         };
       case 'enterprise':
         return {
@@ -102,20 +141,56 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
           price: billingCycle === 'monthly' ? '$99/month' : '$984/year',
           originalPrice: billingCycle === 'yearly' ? '$1,188/year' : undefined,
           savings: billingCycle === 'yearly' ? '$204/year' : undefined,
-          description: 'Unlimited API calls, custom templates, 24/7 support'
+          description: 'Unlimited API calls, custom templates, 24/7 support',
+          features: [
+            'Unlimited API calls',
+            'All premium templates + custom design',
+            '24/7 phone & email support',
+            'Dedicated account manager',
+            'White-label solution',
+            'Unlimited team members',
+            '99.9% SLA guarantee'
+          ]
         };
       case 'donation':
         return {
-          name: 'Donation',
-          price: customAmount ? `$${customAmount}` : 'Custom amount',
-          description: 'Support Devmint development'
+          name: 'Support Devmint',
+          price: customAmount ? `$${customAmount.toFixed(2)}` : 'Custom amount',
+          description: 'Help us continue building amazing API tools',
+          features: [
+            'Support ongoing development',
+            'Help maintain 99.9% uptime',
+            'Enable new feature development',
+            'Keep free tier available',
+            'Improve documentation & support'
+          ]
         };
       default:
-        return { name: '', price: '', description: '' };
+        return { name: '', price: '', description: '', features: [] };
     }
   };
 
   const planDetails = getPlanDetails();
+
+  if (initError) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Payment System Error</h3>
+          <p className="text-red-600 mb-4">{initError}</p>
+          <button
+            onClick={initializePaddle}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Retry Initialization
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -146,6 +221,34 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
         )}
       </div>
 
+      {/* Features List */}
+      {planDetails.features && planDetails.features.length > 0 && (
+        <div className="mb-6">
+          <h4 className="font-semibold text-gray-900 mb-3">What's included:</h4>
+          <ul className="space-y-2">
+            {planDetails.features.map((feature, index) => (
+              <li key={index} className="flex items-center text-sm text-gray-700">
+                <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Status Display */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-xl">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600">Payment System Status:</span>
+          <span className={`font-medium ${
+            isInitialized ? 'text-green-600' : isLoading ? 'text-blue-600' : 'text-red-600'
+          }`}>
+            {paddleStatus}
+          </span>
+        </div>
+      </div>
+
+      {/* Payment Button */}
       <button
         onClick={handleCheckout}
         disabled={isLoading || !isInitialized}
@@ -154,31 +257,59 @@ const PaddleCheckout: React.FC<PaddleCheckoutProps> = ({
         {isLoading ? (
           <>
             <Loader className="w-5 h-5 mr-2 animate-spin" />
-            Processing...
+            {paddleStatus}
           </>
         ) : !isInitialized ? (
-          'Loading...'
+          'Loading Payment System...'
         ) : (
           <>
             <CreditCard className="w-5 h-5 mr-2" />
-            {planType === 'donation' ? 'Donate Now' : `Subscribe ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`}
+            {planType === 'donation' 
+              ? `Donate $${customAmount?.toFixed(2) || '0.00'}` 
+              : `Subscribe ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`
+            }
           </>
         )}
       </button>
 
+      {/* Payment Info */}
       <div className="mt-4 text-center">
-        <p className="text-xs text-gray-500">
-          Secure payment processing by{' '}
+        <div className="text-xs text-gray-500 mb-2">
+          🔒 Secure payment processing by{' '}
           <a href="https://paddle.com" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
             Paddle.com
           </a>
-        </p>
+        </div>
+        
+        <div className="text-xs text-gray-500 mb-2">
+          💳 Accepts: Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay
+        </div>
+        
         {planType !== 'donation' && (
-          <p className="text-xs text-gray-500 mt-1">
-            Cancel anytime • 30-day money-back guarantee
-          </p>
+          <div className="text-xs text-gray-500">
+            ✅ Cancel anytime • 30-day money-back guarantee
+          </div>
+        )}
+        
+        {planType === 'donation' && (
+          <div className="text-xs text-gray-500">
+            ❤️ Thank you for supporting open-source development
+          </div>
         )}
       </div>
+
+      {/* Debug Info (remove in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-3 bg-yellow-50 rounded-xl">
+          <div className="text-xs text-yellow-800">
+            <strong>Debug Info:</strong><br />
+            Paddle Status: {paddle.getStatus()}<br />
+            Plan: {planType} ({billingCycle})<br />
+            {planType !== 'donation' && `Price ID: ${priceIds[planType][billingCycle]}`}<br />
+            {planType === 'donation' && `Amount: $${customAmount?.toFixed(2)}`}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
